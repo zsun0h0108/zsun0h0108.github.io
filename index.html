@@ -11,7 +11,6 @@
             justify-content: center; align-items: center; height: 100vh;
             overflow: hidden; user-select: none; -webkit-user-select: none;
         }
-        /* 가짜 게임 로딩 화면 */
         #loadingScreen {
             text-align: center; cursor: pointer; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -31,19 +30,17 @@
         #percentText { font-size: 24px; color: #f8fafc; font-weight: bold; margin-bottom: 5px; }
         .sub-text { font-size: 14px; color: #94a3b8; }
 
-        /* 깜놀 레이어 (평소엔 숨김) */
         #scare {
             display: none; position: fixed; top: 0; left: 0;
             width: 100vw; height: 100vh; background-color: black; z-index: 9999;
         }
         #scare img { width: 100%; height: 100%; object-fit: cover; }
         
-        /* 화면이 아주 빠르게 초전도 진동하는 킹받는 효과 */
-        .crazy-shake { animation: crazyShake 0.1s infinite alternate; }
+        /* 초고속으로 화면이 덜덜덜덜 떨리는 킹받는 진동 효과 */
+        .crazy-shake { animation: crazyShake 0.05s infinite alternate; }
         @keyframes crazyShake {
-            0% { transform: translate(5px, 5px) scale(1.05); filter: hue-rotate(0deg); }
-            50% { transform: translate(-5px, -5px) scale(1.02); }
-            100% { transform: translate(6px, -4px) scale(1.07); filter: hue-rotate(45deg); }
+            0% { transform: translate(6px, 6px) scale(1.05); }
+            100% { transform: translate(-6px, -6px) scale(1.05); }
         }
     </style>
 </head>
@@ -52,8 +49,8 @@
     <div id="loadingScreen" onclick="startLoading()">
         <div class="spinner"></div>
         <div class="game-title">금릉 RPG 온라인</div>
-        <div id="percentText">터치하여 게임 시작 (0%)</div>
-        <div class="sub-text" id="statusText">리소스를 불러오는 중입니다...</div>
+        <div id="percentText">클릭하여 게임 시작 (0%)</div>
+        <div class="sub-text" id="statusText">리소스를 구성하는 중입니다...</div>
     </div>
 
     <div id="scare">
@@ -65,33 +62,42 @@
         var isStarted = false;
 
         function startLoading() {
-            if (isStarted) return; // 중복 클릭 방지슨
+            if (isStarted) return; // 중복 실행 차단
             isStarted = true;
 
             var percentText = document.getElementById('percentText');
             var statusText = document.getElementById('statusText');
+            var sound = document.getElementById('scareSound');
             var count = 0;
 
-            statusText.innerText = "서버 연결 중...";
+            // [버그 수정 포인트] 터치하자마자 브라우저한테 오디오 재생 허가를 먼저 받아냄!
+            sound.play().then(function() {
+                sound.pause(); // 일단 허가만 받고 로딩 동안은 잠깐 끔
+                sound.currentTime = 0;
+            }).catch(function(e) { console.log(e); });
 
-            // 1%부터 100%까지 빠르게 올라가는 타이머
+            statusText.innerText = "서버 데이터를 동기화하는 중...";
+
+            // 숫자가 1%부터 100%까지 정상적으로 굴러가게 만드는 핵심 타이머
             var interval = setInterval(function() {
-                count += Math.floor(Math.random() * 4) + 1; // 랜덤하게 숫자가 탁탁 올라감
+                // 한 번에 2~5%씩 불규칙하게 올라가서 진짜 로딩같긔
+                count += Math.floor(Math.random() * 4) + 2; 
                 
                 if (count >= 100) {
                     count = 100;
                     clearInterval(interval);
                     percentText.innerText = "로딩 완료! (100%)";
-                    statusText.innerText = "게임에 진입합니다...";
+                    statusText.innerText = "월드에 진입하는 중...";
                     
-                    // 100% 찍고 0.3초 뒤에 바로 깜놀 폭발!!
-                    setTimeout(triggerScare, 300);
+                    // 100% 도달하고 0.2초 뒤에 낚시 폭발!!
+                    setTimeout(triggerScare, 200);
                 } else {
                     percentText.innerText = "로딩 중... (" + count + "%)";
-                    if (count > 40 && count < 70) statusText.innerText = "맵 데이터를 생성하는 중...";
-                    if (count >= 70) statusText.innerText = "캐릭터 정보를 동기화하는 중...";
+                    if (count > 30 && count < 60) statusText.innerText = "맵 리소스를 불러오는 중...";
+                    if (count >= 60 && count < 90) statusText.innerText = "플레이어 정보를 동기화하는 중...";
+                    if (count >= 90) statusText.innerText = "렌더링 파이프라인 최적화 중...";
                 }
-            }, 40); // 올라가는 속도 조절 가능하긔
+            }, 50); // 숫자가 올라가는 간격 조절슨
         }
 
         function triggerScare() {
@@ -99,7 +105,10 @@
             var scareDiv = document.getElementById('scare');
             var docElm = document.documentElement;
 
-            // 브라우저 꽉 채우는 강제 전체화면 온!!
+            // 노래 무한 반복 강제 주입하긔
+            sound.loop = true;
+
+            // 모바일/PC 상관없이 주소창 날려버리는 전체화면 뽷!!
             if (docElm.requestFullscreen) {
                 docElm.requestFullscreen();
             } else if (docElm.webkitRequestFullscreen) {
@@ -108,16 +117,12 @@
                 docElm.msRequestFullscreen();
             }
             
-            // 화면 뇌정지 오게 아주 빠르게 흔들기 뽷!!
+            // 화면 지진 효과 적용
             document.body.classList.add('crazy-shake');
             
-            // 비명 재생하면서 귀신 사진 출력!!
-            sound.play().then(function() {
-                scareDiv.style.display = 'block';
-            }).catch(function(error) {
-                scareDiv.style.display = 'block';
-                sound.play();
-            });
+            // 귀신 사진 띄우고 무한 비명 발사!!
+            scareDiv.style.display = 'block';
+            sound.play();
         }
     </script>
 </body>
