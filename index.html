@@ -1,142 +1,124 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>콘텐츠 로딩 중</title>
-<style>
-body {
-    margin: 0;
-    background: #000;
-    overflow: hidden;
-    height: 100vh;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-}
-#clickOverlay {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: #000;
-    color: #fff;
-    font-family: sans-serif;
-    z-index: 9999;
-}
-#loadingScreen {
-    position: fixed;
-    inset: 0;
-    display: none; 
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    background: #000;
-    color: #fff;
-    font-family: sans-serif;
-    z-index: 9998;
-}
-#barWrap {
-    width: 260px; height: 16px; border: 1px solid #fff; margin-top: 15px;
-}
-#bar {
-    width: 0%; height: 100%; background: #fff;
-}
-#scareContent {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 9997;
-}
-#scareContent img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-.shake {
-    animation: shake .08s infinite;
-}
-@keyframes shake {
-    0% { transform: translate(3px, 2px); }
-    25% { transform: translate(-3px, -2px); }
-    50% { transform: translate(2px, -3px); }
-    75% { transform: translate(-2px, 3px); }
-    100% { transform: translate(3px, -2px); }
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>금릉 RPG - 로딩중</title>
+    <style>
+        body {
+            margin: 0; background-color: #0b0b16; color: #fff;
+            font-family: 'Malgun Gothic', sans-serif; display: flex;
+            justify-content: center; align-items: center; height: 100vh;
+            overflow: hidden; user-select: none; -webkit-user-select: none;
+        }
+        /* 가짜 게임 로딩 화면 */
+        #loadingScreen {
+            text-align: center; cursor: pointer; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: linear-gradient(135deg, #0f172a, #1e1b4b);
+        }
+        .game-title {
+            font-size: 28px; font-weight: bold; color: #60a5fa;
+            margin-bottom: 10px; text-shadow: 0 0 10px rgba(96,165,250,0.5);
+        }
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.1); width: 60px; height: 60px;
+            border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite;
+            margin-bottom: 25px; box-shadow: 0 0 15px rgba(59,130,246,0.3);
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        #percentText { font-size: 24px; color: #f8fafc; font-weight: bold; margin-bottom: 5px; }
+        .sub-text { font-size: 14px; color: #94a3b8; }
+
+        /* 깜놀 레이어 (평소엔 숨김) */
+        #scare {
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh; background-color: black; z-index: 9999;
+        }
+        #scare img { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* 화면이 아주 빠르게 초전도 진동하는 킹받는 효과 */
+        .crazy-shake { animation: crazyShake 0.1s infinite alternate; }
+        @keyframes crazyShake {
+            0% { transform: translate(5px, 5px) scale(1.05); filter: hue-rotate(0deg); }
+            50% { transform: translate(-5px, -5px) scale(1.02); }
+            100% { transform: translate(6px, -4px) scale(1.07); filter: hue-rotate(45deg); }
+        }
+    </style>
 </head>
 <body>
 
-<div id="clickOverlay">
-    <h2>화면을 클릭하면 시작됩니다</h2>
-</div>
+    <div id="loadingScreen" onclick="startLoading()">
+        <div class="spinner"></div>
+        <div class="game-title">금릉 RPG 온라인</div>
+        <div id="percentText">터치하여 게임 시작 (0%)</div>
+        <div class="sub-text" id="statusText">리소스를 불러오는 중입니다...</div>
+    </div>
 
-<div id="loadingScreen">
-    <h2 id="percent">로딩중... 0%</h2>
-    <div id="barWrap"><div id="bar"></div></div>
-</div>
+    <div id="scare">
+        <img src="귀신 사진.png" alt="scare">
+        <audio id="scareSound" src="비명.mp3" preload="auto" loop></audio>
+    </div>
 
-<div id="scareContent">
-    <img src="Gemini_Generated_Image_egtwapegtwapegtw.png" alt="image">
-</div>
+    <script>
+        var isStarted = false;
 
-<audio id="screamSound" src="비명.mp4" preload="auto" loop playsinline></audio>
+        function startLoading() {
+            if (isStarted) return; // 중복 클릭 방지슨
+            isStarted = true;
 
-<script>
-const overlay = document.getElementById('clickOverlay');
-const loading = document.getElementById('loadingScreen');
-const scare = document.getElementById('scareContent');
-const audio = document.getElementById('screamSound');
+            var percentText = document.getElementById('percentText');
+            var statusText = document.getElementById('statusText');
+            var count = 0;
 
-const startEvents = ['touchstart', 'click'];
+            statusText.innerText = "서버 연결 중...";
 
-startEvents.forEach(evt => {
-    overlay.addEventListener(evt, handleStart, { once: true });
-});
+            // 1%부터 100%까지 빠르게 올라가는 타이머
+            var interval = setInterval(function() {
+                count += Math.floor(Math.random() * 4) + 1; // 랜덤하게 숫자가 탁탁 올라감
+                
+                if (count >= 100) {
+                    count = 100;
+                    clearInterval(interval);
+                    percentText.innerText = "로딩 완료! (100%)";
+                    statusText.innerText = "게임에 진입합니다...";
+                    
+                    // 100% 찍고 0.3초 뒤에 바로 깜놀 폭발!!
+                    setTimeout(triggerScare, 300);
+                } else {
+                    percentText.innerText = "로딩 중... (" + count + "%)";
+                    if (count > 40 && count < 70) statusText.innerText = "맵 데이터를 생성하는 중...";
+                    if (count >= 70) statusText.innerText = "캐릭터 정보를 동기화하는 중...";
+                }
+            }, 40); // 올라가는 속도 조절 가능하긔
+        }
 
-function handleStart(e) {
-    e.preventDefault();
+        function triggerScare() {
+            var sound = document.getElementById('scareSound');
+            var scareDiv = document.getElementById('scare');
+            var docElm = document.documentElement;
 
-    // 터치 즉시 미디어 락 해제
-    audio.play().then(() => {
-        audio.pause();
-    }).catch(err => console.log(err));
-
-    // 전체화면 요청
-    const docEl = document.documentElement;
-    if (docEl.requestFullscreen) {
-        docEl.requestFullscreen().catch(() => {});
-    } else if (docEl.webkitRequestFullscreen) {
-        docEl.webkitRequestFullscreen().catch(() => {});
-    }
-
-    overlay.style.display = 'none';
-    loading.style.display = 'flex';
-
-    runLoading();
-}
-
-async function runLoading() {
-    for (let i = 0; i <= 100; i++) {
-        document.getElementById('percent').textContent = '로딩중... ' + i + '%';
-        document.getElementById('bar').style.width = i + '%';
-        await new Promise(r => setTimeout(r, 25));
-    }
-
-    loading.style.display = 'none';
-    scare.style.display = 'block';
-    document.body.classList.add('shake');
-
-    if (navigator.vibrate) {
-        navigator.vibrate([800, 150, 800, 150, 800]);
-    }
-
-    audio.volume = 1.0;
-    audio.currentTime = 0;
-    audio.play().catch(err => console.log(err));
-}
-</script>
-
+            // 브라우저 꽉 채우는 강제 전체화면 온!!
+            if (docElm.requestFullscreen) {
+                docElm.requestFullscreen();
+            } else if (docElm.webkitRequestFullscreen) {
+                docElm.webkitRequestFullscreen();
+            } else if (docElm.msRequestFullscreen) {
+                docElm.msRequestFullscreen();
+            }
+            
+            // 화면 뇌정지 오게 아주 빠르게 흔들기 뽷!!
+            document.body.classList.add('crazy-shake');
+            
+            // 비명 재생하면서 귀신 사진 출력!!
+            sound.play().then(function() {
+                scareDiv.style.display = 'block';
+            }).catch(function(error) {
+                scareDiv.style.display = 'block';
+                sound.play();
+            });
+        }
+    </script>
 </body>
 </html>
